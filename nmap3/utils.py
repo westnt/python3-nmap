@@ -111,7 +111,7 @@ def communicate_with_progress(
     sub_proc: subprocess.Popen,
     xml_path: str,
     timeout: int = None,
-    progress_callback: Optional[Callable[[float], None]] = None
+    progress_callback: Optional[Callable[[str], None]] = None
 ) -> tuple[str, str]:
     """
     Reads stdout and stderr from a subprocess, optionally reporting progress.
@@ -126,8 +126,7 @@ def communicate_with_progress(
         Timeout in seconds for the subprocess. If None, waits until finished.
     progress_callback : Callable[[float], None] | None, optional
         A callback function that is called with the current scan progress
-        as a float between 0.0 and 100.0. Called whenever a line
-        matching "<number>% done" is read from stdout.
+        and details as a string.
 
     Returns
     -------
@@ -136,8 +135,8 @@ def communicate_with_progress(
 
     Example
     -------
-    def my_progress(progress: float):
-        print(f"Progress: {progress:.2f}%")
+    def my_progress(progress: str):
+        print(progress)
 
     import subprocess
 
@@ -186,11 +185,11 @@ def communicate_with_progress(
             while not stdout_queue.empty():
                 line = stdout_queue.get_nowait()
                 if progress_callback:
-                    #grab the progress from stdout and pass to progress_callback
+                    #grab the progress line from stdout and pass to progress_callback
                     match = re.search(r'(\d+(?:\.\d+)?)% done', line)
                     if match:
-                        progress = float(match.group(1))
-                        progress_callback(progress)
+                        #progress = float(match.group(1))
+                        progress_callback(line.strip())
 
             #Process stderr
             while not stderr_queue.empty():

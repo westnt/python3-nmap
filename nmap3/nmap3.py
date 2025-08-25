@@ -125,7 +125,7 @@ class Nmap(object):
         return version_data
 
     # Unique method for repetitive tasks - Use of 'target' variable instead of 'host' or 'subnet' - no need to make difference between 2 strings that are used for the same purpose
-    def scan_command(self, target, arg, args=None, timeout=None):
+    def scan_command(self, target, arg, args=None, timeout=None, progress_callback=None):
         self.target = target
 
         command_args = "{target}  {default}".format(target=target, default=arg)
@@ -134,7 +134,7 @@ class Nmap(object):
             scancommand += " {0}".format(args)
 
         scan_shlex = shlex.split(scancommand)
-        output = self.run_command(scan_shlex, timeout=timeout)
+        output = self.run_command(scan_shlex, timeout=timeout, progress_callback=progress_callback)
         file_name=re.search(r'(\-oX|-oN-|oG)\s+[a-zA-Z-_0-9]{1,100}\.[a-zA-Z]+',scancommand)
         if file_name:
             file_name=scancommand[file_name.start():file_name.end()].split(" ")[0]
@@ -215,42 +215,42 @@ class Nmap(object):
 
     # Using of basic options for stealth scan
     @user_is_root
-    def nmap_stealth_scan(self, target, arg="-Pn -sZ", args=None):
+    def nmap_stealth_scan(self, target, arg="-Pn -sZ", args=None, progress_callback=None):
         """
         nmap -oX - nmmapper.com -Pn -sZ
         """
-        xml_root = self.scan_command(target=target, arg=arg, args=args)
+        xml_root = self.scan_command(target=target, arg=arg, args=args, progress_callback=None)
         self.top_ports = self.parser.filter_top_ports(xml_root)
         return self.top_ports
 
-    def nmap_detect_firewall(self, target, arg="-sA", args=None):  # requires root
+    def nmap_detect_firewall(self, target, arg="-sA", args=None, progress_callback=None):  # requires root
         """
         nmap -oX - nmmapper.com -sA
         @ TODO
         """
-        return self.scan_command(target=target, arg=arg, args=args)
+        return self.scan_command(target=target, arg=arg, args=args, progress_callback=progress_callback)
         # TODO
 
     @user_is_root
-    def nmap_os_detection(self, target, arg="-O", args=None):  # requires root
+    def nmap_os_detection(self, target, arg="-O", args=None, progress_callback=None):  # requires root
         """
         nmap -oX - nmmapper.com -O
         NOTE: Requires root
         """
-        xml_root = self.scan_command(target=target, arg=arg, args=args)
+        xml_root = self.scan_command(target=target, arg=arg, args=args, progress_callback=progress_callback)
         results = self.parser.os_identifier_parser(xml_root)
         return results
 
-    def nmap_subnet_scan(self, target, arg="-p-", args=None):  # requires root
+    def nmap_subnet_scan(self, target, arg="-p-", args=None, progress_callback=None):  # requires root
         """
         nmap -oX - nmmapper.com -p-
         NOTE: Requires root
         """
-        xml_root = self.scan_command(target=target, arg=arg, args=args)
+        xml_root = self.scan_command(target=target, arg=arg, args=args, progress_callback=progress_callback)
         results = self.parser.filter_top_ports(xml_root)
         return results
 
-    def nmap_list_scan(self, target, arg="-sL", args=None):  # requires root
+    def nmap_list_scan(self, target, arg="-sL", args=None, progress_callback=None):  # requires root
         """
         The list scan is a degenerate form of target discovery that simply lists each target of the network(s)
         specified, without sending any packets to the target targets.
@@ -258,7 +258,7 @@ class Nmap(object):
         NOTE: /usr/bin/nmap  -oX  -  192.168.178.1/24  -sL
         """
         self.target = target
-        xml_root = self.scan_command(target=target, arg=arg, args=args)
+        xml_root = self.scan_command(target=target, arg=arg, args=args, progress_callback=progress_callback)
         results = self.parser.filter_top_ports(xml_root)
         return results
 
@@ -325,7 +325,7 @@ class Nmap(object):
         finally:
             # Always restore terminal state, even if error/timeout
             term_state.restore()
-            
+
         if 0 != sub_proc.returncode:
             raise NmapExecutionError(
                     'Error during command: "' + ' '.join(cmd) + '"\n\n' \
