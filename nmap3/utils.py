@@ -28,6 +28,8 @@ import re
 import threading
 import queue
 from typing import Optional, Callable
+import time
+import termios, sys, os
 
 from nmap3.exceptions import NmapNotInstalledError
 
@@ -162,32 +164,50 @@ def communicate_with_progress(
 
     output = ""
     errs = ""
+    start_time = time.time()
+    #save terminal state so it can be restored after exception
+    term_state = TerminalState()
+    term_state.save()
 
-    while True:
-    
-        if sub_proc.poll() is not None and stdout_queue.empty() and stderr_queue.empty():
-            break #once sub_proc terminates and stdout_queue and stderr_queue are empty we are done
+    try:
+        while True:
+        
+            #Check timeout
+            if timeout is not None and (time.time() - start_time) > timeout:
+                sub_proc.kill()
+                errs += f"\nProcess killed after exceeding timeout of {timeout} seconds.\n"
+                break
 
-        #Process stdout
-        while not stdout_queue.empty():
-            line = stdout_queue.get_nowait()
-            if progress_callback:
-                #grab the progress from stdout and pass to progress_callback
-                match = re.search(r'(\d+(?:\.\d+)?)% done', line)
-                if match:
-                    progress = float(match.group(1))
-                    progress_callback(progress)
+            if sub_proc.poll() is not None and stdout_queue.empty() and stderr_queue.empty():
+                sub_proc.kill()
+                break # finished
 
-        #Process stderr
-        while not stderr_queue.empty():
-            line = stderr_queue.get_nowait()
-            errs += line
+            #Process stdout
+            while not stdout_queue.empty():
+                line = stdout_queue.get_nowait()
+                if progress_callback:
+                    #grab the progress from stdout and pass to progress_callback
+                    match = re.search(r'(\d+(?:\.\d+)?)% done', line)
+                    if match:
+                        progress = float(match.group(1))
+                        progress_callback(progress)
 
-    # ensure threads have finished
-    t_out.join()
-    t_err.join()
+            #Process stderr
+            while not stderr_queue.empty():
+                line = stderr_queue.get_nowait()
+                errs += line
 
-    output = read_xml_file(xml_path)
+            time.sleep(0.05) # prevent busy-loop
+    finally:
+        if sub_proc.poll() is None:
+            sub_proc.kill()
+        t_out.join()
+        t_err.join()
+        term_state.restore() #restore terminal state incase sub_proc wrecked our terminal
+
+    # only parse xml if process wasn't killed
+    if sub_proc.returncode == 0:
+        output = read_xml_file(xml_path)
 
     return output, errs
 
@@ -199,3 +219,21 @@ def read_xml_file(path:str) -> str:
         return output
     except Exception as e:
         raise e
+    
+class TerminalState:
+    """
+    class used to save and restore terminal state.
+    """
+    def __init__(self):
+        self.orig_attrs = None
+
+    def save(self):
+        if sys.stdin.isatty():
+            self.orig_attrs = termios.tcgetattr(sys.stdin)
+
+    def restore(self):
+        if self.orig_attrs and sys.stdin.isatty():
+            try:
+                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.orig_attrs)
+            except Exception:
+                os.system("stty sane")  # fallback
