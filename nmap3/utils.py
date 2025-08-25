@@ -104,7 +104,44 @@ def nmap_is_installed_async():
         return wrapped
     return  wrapper 
 
-def communicate_with_progress(sub_proc, timeout=None, progress_callback=None):
+def communicate_with_progress(
+    sub_proc: subprocess.Popen,
+    timeout: int = None,
+    progress_callback: callable[[float], None] = None
+) -> tuple[str, str]:
+    """
+    Reads stdout and stderr from a subprocess, optionally reporting progress.
+
+    Parameters
+    ----------
+    sub_proc : subprocess.Popen
+        The subprocess object to communicate with.
+    timeout : int | None, optional
+        Timeout in seconds for the subprocess. If None, waits until finished.
+    progress_callback : Callable[[float], None] | None, optional
+        A callback function that is called with the current scan progress
+        as a float between 0.0 and 100.0. Called whenever a line
+        matching "<number>% done" is read from stdout.
+
+    Returns
+    -------
+    Tuple[str, str]
+        A tuple containing the full stdout output and stderr output.
+
+    Example
+    -------
+    def my_progress(progress: float):
+        print(f"Progress: {progress:.2f}%")
+
+    import subprocess
+
+    proc = subprocess.Popen(["/usr/bin/nmap", "-oX", "-", "example.com"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True)
+    
+    output, errs = communicate_with_progress(proc, timeout=60, progress_callback=my_progress)
+    """
     stdout_queue = queue.Queue()
     stderr_queue = queue.Queue()
 
@@ -146,3 +183,6 @@ def communicate_with_progress(sub_proc, timeout=None, progress_callback=None):
         output = f.read()
 
     return output, errs
+
+
+communicate_with_progress()
