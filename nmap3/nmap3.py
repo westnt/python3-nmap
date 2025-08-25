@@ -287,12 +287,16 @@ class Nmap(object):
             progress_callback=my_progress_callback
         )
         """
-        if "--stats-every" not in cmd:
-            cmd += ["--stats-every", "1s"]
-
-        if "-oX" in cmd: #TODO: replace
-            index = cmd.index("-oX")  # find the position of "-oX"
-            cmd[index+1] = self.xml_path
+        if progress_callback:
+            #tell nmap to print status every 1 second
+            if "--stats-every" not in cmd:
+                cmd += ["--stats-every", "1s"]
+            #tell nmap to write xml to xml_path
+            if "-oX" in cmd:
+                index = cmd.index("-oX")
+                cmd[index+1] = self.xml_path
+            else:
+                cmd += ["-oX", self.xml_path]
 
         sub_proc = subprocess.Popen(
                 cmd,
@@ -302,12 +306,15 @@ class Nmap(object):
                 )
 
         try:
-            output, errs = communicate_with_progress(
-                sub_proc=sub_proc,
-                xml_path=self.xml_path,
-                timeout=timeout,
-                progress_callback=progress_callback
-            )
+            if(progress_callback):
+                output, errs = communicate_with_progress(
+                    sub_proc=sub_proc,
+                    xml_path=self.xml_path,
+                    timeout=timeout,
+                    progress_callback=progress_callback
+                )
+            else:
+                output, errs = sub_proc.communicate(timeout=timeout)
         except Exception as e:
             sub_proc.kill()
             raise (e)
