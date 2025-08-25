@@ -30,6 +30,7 @@ from nmap3.nmapparser import NmapCommandParser
 from nmap3.utils import get_nmap_path, user_is_root, communicate_with_progress
 from nmap3.exceptions import NmapXMLParserError, NmapExecutionError
 import re
+from typing import Callable, Optional
 
 __author__ = 'Wangolo Joel (inquiry@nmapper.com)'
 __version__ = '1.9.3'
@@ -258,7 +259,7 @@ class Nmap(object):
         results = self.parser.filter_top_ports(xml_root)
         return results
 
-    def run_command(self, cmd: list[str], timeout: int | None = None, progress_callback: callable[[float], None] | None = None):
+    def run_command(self, cmd: list[str], timeout: int | None = None, progress_callback: Optional[Callable[[float], None]] | None = None):
         """
         Runs the nmap command using popen.
 

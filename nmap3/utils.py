@@ -27,6 +27,7 @@ import functools
 import threading
 import queue
 import re
+from typing import Optional, Callable
 
 from nmap3.exceptions import NmapNotInstalledError
 
@@ -107,7 +108,7 @@ def nmap_is_installed_async():
 def communicate_with_progress(
     sub_proc: subprocess.Popen,
     timeout: int = None,
-    progress_callback: callable[[float], None] = None
+    progress_callback: Optional[Callable[[float], None]] = None
 ) -> tuple[str, str]:
     """
     Reads stdout and stderr from a subprocess, optionally reporting progress.
@@ -183,6 +184,3 @@ def communicate_with_progress(
         output = f.read()
 
     return output, errs
-
-
-communicate_with_progress()
