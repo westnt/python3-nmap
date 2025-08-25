@@ -183,6 +183,10 @@ def communicate_with_progress(
             line = stderr_queue.get_nowait()
             errs += line
 
+    # ensure threads have finished
+    t_out.join()
+    t_err.join()
+
     output = read_xml_file(xml_path)
 
     return output, errs
