@@ -27,7 +27,7 @@ import asyncio
 from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import ParseError
 from nmap3.nmapparser import NmapCommandParser
-from nmap3.utils import get_nmap_path, user_is_root
+from nmap3.utils import get_nmap_path, user_is_root, communicate_with_progress
 from nmap3.exceptions import NmapXMLParserError, NmapExecutionError
 import re
 
@@ -127,7 +127,7 @@ class Nmap(object):
         xml_root = self.get_xml_et(output)
         return xml_root
 
-    def scan_top_ports(self, target, default=10, args=None, timeout=None):
+    def scan_top_ports(self, target, default=10, args=None, timeout=None, progress_callback=None):
         """
         Perform nmap's top ports scan
 
@@ -150,7 +150,7 @@ class Nmap(object):
         scan_shlex = shlex.split(scan_command)
 
         # Run the command and get the output
-        output = self.run_command(scan_shlex, timeout=timeout)
+        output = self.run_command(scan_shlex, timeout=timeout, progress_callback=progress_callback)
         if not output:
             # Probaby and error was raise
             raise ValueError("Unable to perform requested command")
@@ -247,20 +247,29 @@ class Nmap(object):
         results = self.parser.filter_top_ports(xml_root)
         return results
 
-    def run_command(self, cmd, timeout=None):
+    def run_command(self, cmd, timeout=None, progress_callback=None):
         """
         Runs the nmap command using popen
 
         @param: cmd--> the command we want run eg /usr/bin/nmap -oX -  nmmapper.com --top-ports 10
         @param: timeout--> command subprocess timeout in seconds.
         """
+        if "--stats-every" not in cmd:
+            cmd += ["--stats-every", "1s"]
+
+        if "-oX" in cmd: #TODO: replace
+            index = cmd.index("-oX")  # find the position of "-oX"
+            cmd[index+1] = "tmp"
+
         sub_proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                stderr=subprocess.PIPE,
+                text=True
                 )
+
         try:
-            output, errs = sub_proc.communicate(timeout=timeout)
+            output, errs = communicate_with_progress(sub_proc=sub_proc, timeout=timeout, progress_callback=progress_callback)
         except Exception as e:
             sub_proc.kill()
             raise (e)
@@ -268,10 +277,9 @@ class Nmap(object):
             if 0 != sub_proc.returncode:
                 raise NmapExecutionError(
                         'Error during command: "' + ' '.join(cmd) + '"\n\n' \
-                        + errs.decode('utf8')
+                        + errs
                         )
-            # Response is bytes so decode the output and return
-            return output.decode('utf8').strip()
+            return output
             
 
     def get_xml_et(self, command_output):

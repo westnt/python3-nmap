@@ -24,6 +24,9 @@ import sys
 import os
 import ctypes
 import functools
+import threading
+import queue
+import re
 
 from nmap3.exceptions import NmapNotInstalledError
 
@@ -100,3 +103,46 @@ def nmap_is_installed_async():
                 return {"error":True, "msg":"Nmap has not been install on this system yet!"}
         return wrapped
     return  wrapper 
+
+def communicate_with_progress(sub_proc, timeout=None, progress_callback=None):
+    stdout_queue = queue.Queue()
+    stderr_queue = queue.Queue()
+
+    def reader(pipe, q):
+        for line in pipe:
+            q.put(line)
+        pipe.close()
+
+    #start threads to read stdout and stderr
+    t_out = threading.Thread(target=reader, args=(sub_proc.stdout, stdout_queue))
+    t_err = threading.Thread(target=reader, args=(sub_proc.stderr, stderr_queue))
+    t_out.start()
+    t_err.start()
+
+    output = ""
+    errs = ""
+
+    while True:
+    
+        if sub_proc.poll() is not None and stdout_queue.empty() and stderr_queue.empty():
+            break #once sub_proc terminates and stdout_queue and stderr_queue are empty we are done
+
+        #Process stdout
+        while not stdout_queue.empty():
+            line = stdout_queue.get_nowait()
+            if progress_callback:
+                #grab the progress from stdout and pass to progress_callback
+                match = re.search(r'(\d+(?:\.\d+)?)% done', line)
+                if match:
+                    progress = float(match.group(1))
+                    progress_callback(progress)
+
+        #Process stderr
+        while not stderr_queue.empty():
+            line = stderr_queue.get_nowait()
+            errs += line
+
+    with open("tmp") as f: #TODO: replace
+        output = f.read()
+
+    return output, errs
