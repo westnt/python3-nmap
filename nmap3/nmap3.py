@@ -27,7 +27,7 @@ import asyncio
 from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import ParseError
 from nmap3.nmapparser import NmapCommandParser
-from nmap3.utils import get_nmap_path, user_is_root, read_xml_file, communicate_with_progress
+from nmap3.utils import get_nmap_path, user_is_root, read_xml_file, communicate_with_progress, TerminalState
 from nmap3.exceptions import NmapXMLParserError, NmapExecutionError
 import re
 import os
@@ -298,6 +298,10 @@ class Nmap(object):
             else:
                 cmd += ["-oX", self.xml_path]
 
+        #save terminal state incase sub_proc wrecks out terminal on exception
+        term_state = TerminalState()
+        term_state.save()
+
         sub_proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -318,13 +322,16 @@ class Nmap(object):
         except Exception as e:
             sub_proc.kill()
             raise (e)
-        else:
-            if 0 != sub_proc.returncode:
-                raise NmapExecutionError(
-                        'Error during command: "' + ' '.join(cmd) + '"\n\n' \
-                        + errs
-                        )
-            return output
+        finally:
+            # Always restore terminal state, even if error/timeout
+            term_state.restore()
+            
+        if 0 != sub_proc.returncode:
+            raise NmapExecutionError(
+                    'Error during command: "' + ' '.join(cmd) + '"\n\n' \
+                    + errs
+                    )
+        return output
 
     def get_xml_et(self, command_output):
         """
