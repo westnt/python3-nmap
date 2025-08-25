@@ -247,12 +247,30 @@ class Nmap(object):
         results = self.parser.filter_top_ports(xml_root)
         return results
 
-    def run_command(self, cmd, timeout=None, progress_callback=None):
+    def run_command(self, cmd: list[str], timeout: int | None = None, progress_callback: callable[[float], None] | None = None):
         """
-        Runs the nmap command using popen
+        Runs the nmap command using popen.
 
-        @param: cmd--> the command we want run eg /usr/bin/nmap -oX -  nmmapper.com --top-ports 10
-        @param: timeout--> command subprocess timeout in seconds.
+        Parameters
+        ----------
+        cmd : list[str]
+            The command to run, e.g. ['/usr/bin/nmap', '-oX', '-', 'nmmapper.com', '--top-ports', '10'].
+        timeout : int | None
+            Timeout in seconds for the subprocess. If None, waits until finished.
+        progress_callback : callable[[float], None] | None
+            Optional callback function called with the current scan progress (0.0–100.0).
+
+        Example
+        -------
+        def my_progress_callback(progress: float):
+            print(f"Scan progress: {progress:.2f}%")
+
+        nmap = Nmap()
+        nmap.run_command(
+            cmd=["/usr/bin/nmap", "-oX", "-", "example.com", "--top-ports", "10"],
+            timeout=60,
+            progress_callback=my_progress_callback
+        )
         """
         if "--stats-every" not in cmd:
             cmd += ["--stats-every", "1s"]
