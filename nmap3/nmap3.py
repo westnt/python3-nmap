@@ -53,7 +53,7 @@ class Nmap(object):
 
         :param path: Path where nmap is installed on a user system. On linux system it's typically on /usr/bin/nmap.
         """
-        self._set_uid() #set self.id
+        self.id = self._set_uid() #set self.id
         self.nmaptool = get_nmap_path(path) # check path, search or raise error
         self.default_args = "{nmap}  {outarg}  -  "
         self.maxport = 65535
@@ -62,14 +62,15 @@ class Nmap(object):
         self.parser = NmapCommandParser(None)
         self.raw_output = None
         self.as_root = False
+        self.xml_path = f"tmp/{self.id}.xml"
 
-    def _set_uid(self):
+    def _set_uid(self) -> str:
         """
         Assign a unique ID to this instance using a class-level counter.
         """
         type(self)._id_counter += 1 #inc class-level counter
-        self.id = type(self)._id_counter #get UID for class instance
-        self.id = str(self.id)
+        id = type(self)._id_counter #get UID for class instance
+        return str(id)
 
     def require_root(self, required=True):
         """
