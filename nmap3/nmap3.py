@@ -27,12 +27,11 @@ import asyncio
 from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import ParseError
 from nmap3.nmapparser import NmapCommandParser
-from nmap3.utils import get_nmap_path, user_is_root, read_xml_file
+from nmap3.utils import get_nmap_path, user_is_root, read_xml_file, communicate_with_progress
 from nmap3.exceptions import NmapXMLParserError, NmapExecutionError
 import re
+import os
 from typing import Callable, Optional
-import threading
-import queue
 
 __author__ = 'Wangolo Joel (inquiry@nmapper.com)'
 __version__ = '1.9.3'
@@ -64,7 +63,8 @@ class Nmap(object):
         self.parser = NmapCommandParser(None)
         self.raw_output = None
         self.as_root = False
-        self.xml_path = f"tmp/{self.id}.xml"
+        module_dir = os.path.dirname(__file__)
+        self.xml_path = os.path.join(module_dir, "tmp", f"{self.id}.xml")
 
     def _set_uid(self) -> str:
         """
@@ -262,86 +262,6 @@ class Nmap(object):
         results = self.parser.filter_top_ports(xml_root)
         return results
 
-    def communicate_with_progress(
-        self,
-        sub_proc: subprocess.Popen,
-        timeout: int = None,
-        progress_callback: Optional[Callable[[float], None]] = None
-    ) -> tuple[str, str]:
-        """
-        Reads stdout and stderr from a subprocess, optionally reporting progress.
-
-        Parameters
-        ----------
-        sub_proc : subprocess.Popen
-            The subprocess object to communicate with.
-        timeout : int | None, optional
-            Timeout in seconds for the subprocess. If None, waits until finished.
-        progress_callback : Callable[[float], None] | None, optional
-            A callback function that is called with the current scan progress
-            as a float between 0.0 and 100.0. Called whenever a line
-            matching "<number>% done" is read from stdout.
-
-        Returns
-        -------
-        Tuple[str, str]
-            A tuple containing the full stdout output and stderr output.
-
-        Example
-        -------
-        def my_progress(progress: float):
-            print(f"Progress: {progress:.2f}%")
-
-        import subprocess
-
-        proc = subprocess.Popen(["/usr/bin/nmap", "-oX", "-", "example.com"],
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE,
-                                text=True)
-        
-        output, errs = communicate_with_progress(proc, timeout=60, progress_callback=my_progress)
-        """
-        stdout_queue = queue.Queue()
-        stderr_queue = queue.Queue()
-
-        def reader(pipe, q):
-            for line in pipe:
-                q.put(line)
-            pipe.close()
-
-        #start threads to read stdout and stderr
-        t_out = threading.Thread(target=reader, args=(sub_proc.stdout, stdout_queue))
-        t_err = threading.Thread(target=reader, args=(sub_proc.stderr, stderr_queue))
-        t_out.start()
-        t_err.start()
-
-        output = ""
-        errs = ""
-
-        while True:
-        
-            if sub_proc.poll() is not None and stdout_queue.empty() and stderr_queue.empty():
-                break #once sub_proc terminates and stdout_queue and stderr_queue are empty we are done
-
-            #Process stdout
-            while not stdout_queue.empty():
-                line = stdout_queue.get_nowait()
-                if progress_callback:
-                    #grab the progress from stdout and pass to progress_callback
-                    match = re.search(r'(\d+(?:\.\d+)?)% done', line)
-                    if match:
-                        progress = float(match.group(1))
-                        progress_callback(progress)
-
-            #Process stderr
-            while not stderr_queue.empty():
-                line = stderr_queue.get_nowait()
-                errs += line
-
-        output = read_xml_file(self.xml_path)
-
-        return output, errs
-
     def run_command(self, cmd: list[str], timeout: int | None = None, progress_callback: Optional[Callable[[float], None]] | None = None):
         """
         Runs the nmap command using popen.
@@ -372,7 +292,7 @@ class Nmap(object):
 
         if "-oX" in cmd: #TODO: replace
             index = cmd.index("-oX")  # find the position of "-oX"
-            cmd[index+1] = "tmp"
+            cmd[index+1] = self.xml_path
 
         sub_proc = subprocess.Popen(
                 cmd,
@@ -382,7 +302,12 @@ class Nmap(object):
                 )
 
         try:
-            output, errs = communicate_with_progress(sub_proc=sub_proc, timeout=timeout, progress_callback=progress_callback)
+            output, errs = communicate_with_progress(
+                sub_proc=sub_proc,
+                xml_path=self.xml_path,
+                timeout=timeout,
+                progress_callback=progress_callback
+            )
         except Exception as e:
             sub_proc.kill()
             raise (e)
