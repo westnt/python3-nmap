@@ -42,6 +42,7 @@ class Nmap(object):
     This nmap class allows us to use the nmap port scanner tool from within python
     by calling nmap3.Nmap()
     """
+    _id_counter = 0 # class-level counter used to compute unique IDs. shared across all instances of class
 
     def __init__(self, path:str=''):
         """
@@ -49,7 +50,7 @@ class Nmap(object):
 
         :param path: Path where nmap is installed on a user system. On linux system it's typically on /usr/bin/nmap.
         """
-
+        self._set_uid() #set self.id
         self.nmaptool = get_nmap_path(path) # check path, search or raise error
         self.default_args = "{nmap}  {outarg}  -  "
         self.maxport = 65535
@@ -58,6 +59,14 @@ class Nmap(object):
         self.parser = NmapCommandParser(None)
         self.raw_output = None
         self.as_root = False
+
+    def _set_uid(self):
+        """
+        Assign a unique string ID to this instance using a class-level counter.
+        """
+        type(self)._id_counter += 1 #inc class-level counter
+        self.id = type(self)._id_counter #get UID for class instance
+        self.id = str(self.id)
 
     def require_root(self, required=True):
         """
