@@ -42,7 +42,9 @@ class Nmap(object):
     This nmap class allows us to use the nmap port scanner tool from within python
     by calling nmap3.Nmap()
     """
-    _id_counter = 0 # class-level counter used to compute unique IDs. shared across all instances of class
+    _id_counter = 0 # class-level counter used to compute unique IDs.
+                    # shared across all instances of class.
+                    # Do not alter or read outside _set_uid function
 
     def __init__(self, path:str=''):
         """
@@ -62,7 +64,7 @@ class Nmap(object):
 
     def _set_uid(self):
         """
-        Assign a unique string ID to this instance using a class-level counter.
+        Assign a unique ID to this instance using a class-level counter.
         """
         type(self)._id_counter += 1 #inc class-level counter
         self.id = type(self)._id_counter #get UID for class instance
