@@ -27,11 +27,13 @@ import asyncio
 from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import ParseError
 from nmap3.nmapparser import NmapCommandParser
-from nmap3.utils import get_nmap_path, user_is_root, read_xml_file, communicate_with_progress, TerminalState
+from nmap3.utils import get_nmap_path, user_is_root, communicate_with_progress, TerminalState
 from nmap3.exceptions import NmapXMLParserError, NmapExecutionError
 import re
 import os
 from typing import Callable, Optional
+import tempfile
+import atexit
 
 __author__ = 'Wangolo Joel (inquiry@nmapper.com)'
 __version__ = '1.9.3'
@@ -44,17 +46,12 @@ class Nmap(object):
     This nmap class allows us to use the nmap port scanner tool from within python
     by calling nmap3.Nmap()
     """
-    _id_counter = 0 # class-level counter used to compute unique IDs.
-                    # shared across all instances of class.
-                    # Do not alter or read outside _set_uid function
-
     def __init__(self, path:str=''):
         """
         Module initialization
 
         :param path: Path where nmap is installed on a user system. On linux system it's typically on /usr/bin/nmap.
         """
-        self.id = self._set_uid() #set self.id
         self.nmaptool = get_nmap_path(path) # check path, search or raise error
         self.default_args = "{nmap}  {outarg}  -  "
         self.maxport = 65535
@@ -64,15 +61,22 @@ class Nmap(object):
         self.raw_output = None
         self.as_root = False
         module_dir = os.path.dirname(__file__)
-        self.xml_path = os.path.join(module_dir, "tmp", f"{self.id}.xml")
 
-    def _set_uid(self) -> str:
+        #get file to store xml output if progress_callback is used
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".xml", delete=False) as tmp:
+            self.xml_path = tmp.name
+
+        atexit.register(self.cleanup) #always run cleanup on program termination
+
+    def __del__(self):
+        self.cleanup()
+
+    def cleanup(self):
         """
-        Assign a unique ID to this instance using a class-level counter.
+        remove the xml file on termination or garbage collection
         """
-        type(self)._id_counter += 1 #inc class-level counter
-        id = type(self)._id_counter #get UID for class instance
-        return str(id)
+        if os.path.exists(self.xml_path):
+            os.remove(self.xml_path)  
 
     def require_root(self, required=True):
         """
@@ -262,7 +266,7 @@ class Nmap(object):
         results = self.parser.filter_top_ports(xml_root)
         return results
 
-    def run_command(self, cmd: list[str], timeout: int | None = None, progress_callback: Optional[Callable[[float], None]] | None = None):
+    def run_command(self, cmd: list[str], timeout: int | None = None, progress_callback: Optional[Callable[[str], None]] | None = None):
         """
         Runs the nmap command using popen.
 
@@ -272,13 +276,13 @@ class Nmap(object):
             The command to run, e.g. ['/usr/bin/nmap', '-oX', '-', 'nmmapper.com', '--top-ports', '10'].
         timeout : int | None
             Timeout in seconds for the subprocess. If None, waits until finished.
-        progress_callback : callable[[float], None] | None
-            Optional callback function called with the current scan progress (0.0–100.0).
+        progress_callback : callable[[str], None] | None
+            Optional callback function called with the current scan progress.
 
         Example
         -------
-        def my_progress_callback(progress: float):
-            print(f"Scan progress: {progress:.2f}%")
+        def my_progress_callback(progress: str):
+            print(progress)
 
         nmap = Nmap()
         nmap.run_command(

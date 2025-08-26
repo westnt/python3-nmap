@@ -206,15 +206,20 @@ def communicate_with_progress(
 
     # only parse xml if process wasn't killed
     if sub_proc.returncode == 0:
-        output = read_xml_file(xml_path)
+        output = read_then_truncate(xml_path)
 
     return output, errs
 
-def read_xml_file(path:str) -> str:
+def read_then_truncate(path:str) -> str:
+    """
+    read a file, then seek to begining and truncate.
+    """
     try:
         output = ""
-        with open(path) as f:
+        with open(path, 'r+') as f:
             output = f.read()
+            f.seek(0)
+            f.truncate()
         return output
     except Exception as e:
         raise e
