@@ -102,9 +102,3 @@ venv.bak/
 
 # mypy
 .mypy_cache/
-
-# Ignore all files in tmp/
-tmp/*
-
-# But do not ignore the placeholder file, so Git keeps the directory
-!tmp/.gitkeep
