@@ -188,7 +188,6 @@ def communicate_with_progress(
                     #grab the progress line from stdout and pass to progress_callback
                     match = re.search(r'(\d+(?:\.\d+)?)% done', line)
                     if match:
-                        #progress = float(match.group(1))
                         progress_callback(line.strip())
 
             #Process stderr
