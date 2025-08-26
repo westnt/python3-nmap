@@ -131,21 +131,7 @@ def communicate_with_progress(
     Returns
     -------
     Tuple[str, str]
-        A tuple containing the full stdout output and stderr output.
-
-    Example
-    -------
-    def my_progress(progress: str):
-        print(progress)
-
-    import subprocess
-
-    proc = subprocess.Popen(["/usr/bin/nmap", "-oX", "-", "example.com"],
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            text=True)
-    
-    output, errs = communicate_with_progress(proc, timeout=60, progress_callback=my_progress)
+        A tuple containing xml and stderr output.
     """
     stdout_queue = queue.Queue()
     stderr_queue = queue.Queue()

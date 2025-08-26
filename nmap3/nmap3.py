@@ -60,7 +60,6 @@ class Nmap(object):
         self.parser = NmapCommandParser(None)
         self.raw_output = None
         self.as_root = False
-        module_dir = os.path.dirname(__file__)
 
         #get file to store xml output if progress_callback is used
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".xml", delete=False) as tmp:
@@ -302,7 +301,7 @@ class Nmap(object):
             else:
                 cmd += ["-oX", self.xml_path]
 
-        #save terminal state incase sub_proc wrecks out terminal on exception
+        #save terminal state in case sub_proc wrecks terminal on exception
         term_state = TerminalState()
         term_state.save()
 
