@@ -274,6 +274,7 @@ class Nmap(object):
         )
         """
 
+        xml_path = None
         if progress_callback:
             #get file to store xml output if progress_callback is used
             with tempfile.NamedTemporaryFile(mode="w+", suffix=".xml", delete=False) as tmp:
@@ -311,7 +312,8 @@ class Nmap(object):
             sub_proc.kill()
             raise (e)
         finally:
-            os.remove(xml_path)
+            if(xml_path):
+                os.remove(xml_path)
 
         if 0 != sub_proc.returncode:
             raise NmapExecutionError(
