@@ -29,7 +29,6 @@ import threading
 import queue
 from typing import Optional, Callable
 import time
-import termios, sys, os
 
 from nmap3.exceptions import NmapNotInstalledError
 
@@ -184,21 +183,3 @@ def communicate_with_progress(
         output = f.read()
 
     return output, errs
-    
-class TerminalState:
-    """
-    class used to save and restore terminal state.
-    """
-    def __init__(self):
-        self.orig_attrs = None
-
-    def save(self):
-        if sys.stdin.isatty():
-            self.orig_attrs = termios.tcgetattr(sys.stdin)
-
-    def restore(self):
-        if self.orig_attrs and sys.stdin.isatty():
-            try:
-                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.orig_attrs)
-            except Exception:
-                os.system("stty sane")  # fallback
