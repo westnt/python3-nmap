@@ -49,10 +49,8 @@ class Nmap(object):
     def __init__(self, path:str=''):
         """
         Module initialization
-
         :param path: Path where nmap is installed on a user system. On linux system it's typically on /usr/bin/nmap.
         """
-        
         self.nmaptool = get_nmap_path(path) # check path, search or raise error
         self.default_args = "{nmap}  {outarg}  -  "
         self.maxport = 65535
