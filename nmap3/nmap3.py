@@ -27,13 +27,12 @@ import asyncio
 from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import ParseError
 from nmap3.nmapparser import NmapCommandParser
-from nmap3.utils import get_nmap_path, user_is_root, communicate_with_progress, TerminalState
+from nmap3.utils import get_nmap_path, user_is_root, communicate_with_progress
 from nmap3.exceptions import NmapXMLParserError, NmapExecutionError
 import re
-import os
 from typing import Callable, Optional
 import tempfile
-import atexit
+import os
 
 __author__ = 'Wangolo Joel (inquiry@nmapper.com)'
 __version__ = '1.9.3'
@@ -60,22 +59,6 @@ class Nmap(object):
         self.parser = NmapCommandParser(None)
         self.raw_output = None
         self.as_root = False
-
-        #get file to store xml output if progress_callback is used
-        with tempfile.NamedTemporaryFile(mode="w+", suffix=".xml", delete=False) as tmp:
-            self.xml_path = tmp.name
-
-        atexit.register(self.cleanup) #always run cleanup on program termination
-
-    def __del__(self):
-        self.cleanup()
-
-    def cleanup(self):
-        """
-        remove the xml file on termination or garbage collection
-        """
-        if os.path.exists(self.xml_path):
-            os.remove(self.xml_path)  
 
     def require_root(self, required=True):
         """
@@ -290,20 +273,22 @@ class Nmap(object):
             progress_callback=my_progress_callback
         )
         """
+
         if progress_callback:
+            #get file to store xml output if progress_callback is used
+            with tempfile.NamedTemporaryFile(mode="w+", suffix=".xml", delete=False) as tmp:
+                xml_path = tmp.name
+
             #tell nmap to print status every 1 second
             if "--stats-every" not in cmd:
                 cmd += ["--stats-every", "1s"]
+
             #tell nmap to write xml to xml_path
             if "-oX" in cmd:
                 index = cmd.index("-oX")
-                cmd[index+1] = self.xml_path
+                cmd[index+1] = xml_path
             else:
-                cmd += ["-oX", self.xml_path]
-
-        #save terminal state in case sub_proc wrecks terminal on exception
-        term_state = TerminalState()
-        term_state.save()
+                cmd += ["-oX", xml_path]
 
         sub_proc = subprocess.Popen(
                 cmd,
@@ -316,7 +301,7 @@ class Nmap(object):
             if(progress_callback):
                 output, errs = communicate_with_progress(
                     sub_proc=sub_proc,
-                    xml_path=self.xml_path,
+                    xml_path=xml_path,
                     timeout=timeout,
                     progress_callback=progress_callback
                 )
@@ -326,8 +311,7 @@ class Nmap(object):
             sub_proc.kill()
             raise (e)
         finally:
-            # Always restore terminal state, even if error/timeout
-            term_state.restore()
+            os.remove(xml_path)
 
         if 0 != sub_proc.returncode:
             raise NmapExecutionError(

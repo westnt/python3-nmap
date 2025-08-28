@@ -133,6 +133,7 @@ def communicate_with_progress(
     Tuple[str, str]
         A tuple containing xml and stderr output.
     """
+
     stdout_queue = queue.Queue()
     stderr_queue = queue.Queue()
 
@@ -150,64 +151,39 @@ def communicate_with_progress(
     output = ""
     errs = ""
     start_time = time.time()
-    #save terminal state so it can be restored after exception
-    term_state = TerminalState()
-    term_state.save()
 
-    try:
-        while True:
-        
-            #Check timeout
-            if timeout is not None and (time.time() - start_time) > timeout:
-                sub_proc.kill()
-                errs += f"\nProcess killed after exceeding timeout of {timeout} seconds.\n"
-                break
-
-            if sub_proc.poll() is not None and stdout_queue.empty() and stderr_queue.empty():
-                sub_proc.kill()
-                break # finished
-
-            #Process stdout
-            while not stdout_queue.empty():
-                line = stdout_queue.get_nowait()
-                if progress_callback:
-                    #grab the progress line from stdout and pass to progress_callback
-                    match = re.search(r'(\d+(?:\.\d+)?)% done', line)
-                    if match:
-                        progress_callback(line.strip())
-
-            #Process stderr
-            while not stderr_queue.empty():
-                line = stderr_queue.get_nowait()
-                errs += line
-
-            time.sleep(0.05) # prevent busy-loop
-    finally:
-        if sub_proc.poll() is None:
+    while True:
+    
+        #Check timeout
+        if timeout is not None and (time.time() - start_time) > timeout:
             sub_proc.kill()
-        t_out.join()
-        t_err.join()
-        term_state.restore() #restore terminal state incase sub_proc wrecked our terminal
+            errs += f"\nProcess killed after exceeding timeout of {timeout} seconds.\n"
+            break
 
-    # only parse xml if process wasn't killed
-    if sub_proc.returncode == 0:
-        output = read_then_truncate(xml_path)
+        if sub_proc.poll() is not None and stdout_queue.empty() and stderr_queue.empty():
+            sub_proc.kill()
+            break # finished
+
+        #Process stdout
+        while not stdout_queue.empty():
+            line = stdout_queue.get_nowait()
+            if progress_callback:
+                #grab the progress line from stdout and pass to progress_callback
+                match = re.search(r'(\d+(?:\.\d+)?)% done', line)
+                if match:
+                    progress_callback(line.strip())
+
+        #Process stderr
+        while not stderr_queue.empty():
+            line = stderr_queue.get_nowait()
+            errs += line
+
+        time.sleep(0.05) # prevent busy-loop
+
+    with open(xml_path) as f:
+        output = f.read()
 
     return output, errs
-
-def read_then_truncate(path:str) -> str:
-    """
-    read a file, then seek to begining and truncate.
-    """
-    try:
-        output = ""
-        with open(path, 'r+') as f:
-            output = f.read()
-            f.seek(0)
-            f.truncate()
-        return output
-    except Exception as e:
-        raise e
     
 class TerminalState:
     """
